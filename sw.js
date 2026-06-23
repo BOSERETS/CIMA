@@ -4,7 +4,7 @@
    À CHAQUE déploiement : incrémenter CACHE_VERSION ci-dessous.
    ============================================================ */
 
-var CACHE_VERSION = 'registre-v1';
+var CACHE_VERSION = 'registre-v2';
 
 /* Chemins relatifs au scope du SW (= dossier où il est servi).
    On met en cache la racine ET index.html : sur GitHub Pages, l'URL
