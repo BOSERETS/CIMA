@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a2e1a">
+<link rel="manifest" href="manifest.json">
+<title>Registre de présences</title>
+<style>
+:root {
+  --bg: #f5f4f0; --surface: #ffffff; --surface2: #f0efe9; --border: #d8d6cc;
+  --text: #1a1a18; --text2: #5a5a52; --text3: #9a9a90;
+  --green: #2d6a2d; --green-light: #e8f4e8; --green-dark: #1a3d1a;
+  --amber: #8b5e00; --amber-light: #fdf3dc;
+  --blue: #1a4a7a; --blue-light: #e6f0fb;
+  --red: #8b2020; --radius: 10px; --radius-sm: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); min-height: 100vh; max-width: 480px; margin: 0 auto; }
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+.bottom-nav { position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; z-index: 100; }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 8px 4px 10px; gap: 3px; border: none; background: none; cursor: pointer; color: var(--text3); font-size: 10px; font-family: inherit; transition: color 0.15s; }
+.nav-btn.active { color: var(--green); }
+.nav-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.screen { display: none; flex: 1; flex-direction: column; overflow-y: auto; }
+.screen.active { display: flex; }
+.topbar { background: var(--green-dark); color: #fff; padding: 14px 16px 12px; position: sticky; top: 0; z-index: 50; }
+.topbar h1 { font-size: 17px; font-weight: normal; letter-spacing: 0.02em; }
+.topbar .sub { font-size: 11px; opacity: 0.7; margin-top: 2px; font-style: italic; }
+.topbar-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.icon-btn { background: rgba(255,255,255,0.15); border: none; color: #fff; border-radius: var(--radius-sm); padding: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* listes génériques */
+.section-title { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; padding: 14px 16px 6px; }
+.list-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); cursor: pointer; gap: 10px; }
+.list-item:hover { background: var(--surface2); }
+.list-item .li-main { min-width: 0; flex: 1; }
+.li-name { font-size: 14px; color: var(--text); }
+.li-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.li-badge { font-size: 11px; color: var(--green); background: var(--green-light); border-radius: 20px; padding: 3px 10px; white-space: nowrap; }
+.li-badge.muted { color: var(--text3); background: var(--surface2); }
+.li-badge.amber { color: var(--amber); background: var(--amber-light); }
+.li-chevron { color: var(--text3); flex-shrink: 0; }
+.li-chevron svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+.add-btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 16px; color: var(--green); font-size: 13px; cursor: pointer; border: 1.5px dashed var(--green); border-radius: var(--radius); margin: 12px 16px; background: none; font-family: inherit; width: calc(100% - 32px); }
+.add-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 24px; text-align: center; gap: 12px; flex: 1; }
+.empty-state svg { width: 48px; height: 48px; stroke: var(--text3); fill: none; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+.empty-state p { font-size: 14px; color: var(--text3); line-height: 1.6; }
+.empty-state .hint { font-size: 12px; color: var(--text3); font-style: italic; }
+
+/* boutons */
+.btn { padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 12px; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 5px; }
+.btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.btn.danger { color: var(--red); border-color: #f5c0c0; }
+.btn.primary { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
+.btn.block { width: 100%; }
+
+/* détail sortie */
+.detail-back { display: flex; align-items: center; gap: 6px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); cursor: pointer; color: var(--green); font-size: 13px; position: sticky; top: 0; z-index: 40; }
+.detail-back svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.detail-header { padding: 14px 16px; background: var(--green-dark); color: #fff; }
+.detail-header h2 { font-size: 17px; font-weight: normal; }
+.detail-header .alt { font-size: 12px; opacity: 0.75; margin-top: 3px; font-style: italic; }
+.eff-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; background: var(--surface); border-bottom: 2px solid var(--green-dark); }
+.stat-card { background: var(--surface2); border-radius: var(--radius-sm); padding: 10px 12px; }
+.stat-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+.stat-value { font-size: 22px; color: var(--text); }
+.stat-unit { font-size: 11px; color: var(--text3); }
+
+/* pointage : ligne abonné */
+.pp-row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.pp-row.present { background: var(--green-light); }
+.pp-check { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; background: var(--surface); }
+.pp-row.present .pp-check { background: var(--green); border-color: var(--green); }
+.pp-check svg { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.pp-row.present .pp-check svg { opacity: 1; }
+.pp-name { flex: 1; min-width: 0; font-size: 14px; }
+.pp-name small { display: block; font-size: 11px; color: var(--text3); margin-top: 1px; }
+.pp-stepper { display: flex; align-items: center; gap: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; flex-shrink: 0; opacity: 0.35; pointer-events: none; transition: opacity 0.15s; }
+.pp-row.present .pp-stepper { opacity: 1; pointer-events: auto; }
+.pp-stepper button { width: 30px; height: 30px; border: none; background: var(--surface2); color: var(--text); font-size: 16px; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; }
+.pp-stepper button:active { background: var(--border); }
+.pp-stepper .pp-nb { min-width: 30px; text-align: center; font-size: 14px; }
+
+/* recherche / filtre */
+.search-row { padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+.search-input { flex: 1; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 13px; font-family: inherit; background: var(--surface); color: var(--text); }
+.search-input:focus { outline: none; border-color: var(--green); }
+.filter-chip { font-size: 11px; padding: 6px 10px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); color: var(--text2); cursor: pointer; font-family: inherit; white-space: nowrap; }
+.filter-chip.on { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
+
+/* fiche abonné cumul */
+.ab-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); gap: 10px; }
+.ab-row.inactive .ab-name { color: var(--text3); }
+.ab-name { font-size: 14px; flex: 1; min-width: 0; }
+.ab-name small { display: block; font-size: 11px; color: var(--text3); margin-top: 1px; }
+.ab-cumul { font-size: 18px; color: var(--green); white-space: nowrap; }
+.ab-cumul small { font-size: 10px; color: var(--text3); }
+.ab-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.mini-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px; cursor: pointer; color: var(--text2); display: flex; }
+.mini-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.mini-btn.danger { color: var(--red); border-color: #f5c0c0; }
+
+/* réglages */
+.params-screen { padding-bottom: 20px; }
+.set-block { background: var(--surface); margin: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.set-block-title { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+.set-row { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.set-row:last-child { border-bottom: none; }
+.set-row .desc { font-size: 11px; color: var(--text3); margin-bottom: 8px; line-height: 1.4; }
+.set-warn { color: var(--amber); }
+.backup-status { font-size: 12px; padding: 10px 14px; line-height: 1.5; }
+.backup-status.ok { color: var(--green); }
+.backup-status.warn { color: var(--amber); }
+
+/* modal (bottom sheet) */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; align-items: flex-end; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border-radius: var(--radius) var(--radius) 0 0; width: 100%; max-width: 480px; margin: 0 auto; padding-bottom: env(safe-area-inset-bottom, 10px); max-height: 90vh; overflow-y: auto; }
+.modal-title { font-size: 15px; padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text3); padding: 0 4px; }
+.form-row { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 10px; }
+.form-row:last-of-type { border-bottom: none; }
+.form-label { font-size: 13px; color: var(--text); flex: 1; min-width: 0; }
+.form-input { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 14px; background: var(--surface); color: var(--text); font-family: inherit; }
+.form-input:focus { outline: none; border-color: var(--green); }
+.form-input.wide { width: 100%; }
+.form-actions { padding: 12px 16px; display: flex; gap: 8px; }
+
+/* fichier caché */
+.file-hidden { display: none; }
+
+/* Toast */
+.toast-wrap { position: fixed; left: 0; right: 0; bottom: 76px; display: flex; justify-content: center; z-index: 400; pointer-events: none; padding: 0 16px; }
+.toast { background: var(--green-dark); color: #fff; padding: 12px 16px; border-radius: var(--radius); max-width: 420px; width: 100%; box-shadow: 0 4px 16px rgba(0,0,0,0.25); opacity: 0; transform: translateY(12px); transition: opacity 0.2s, transform 0.2s; pointer-events: none; }
+.toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.toast.error { background: #6e1717; }
+.toast .toast-head { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.7; margin-bottom: 3px; }
+.toast .toast-msg { font-size: 13px; line-height: 1.4; }
+/* Confirm */
+.confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500; align-items: center; justify-content: center; padding: 24px; }
+.confirm-overlay.open { display: flex; }
+.confirm-box { background: var(--surface); border-radius: var(--radius); max-width: 360px; width: 100%; overflow: hidden; }
+.confirm-head { background: var(--green-dark); color: #fff; padding: 12px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.confirm-body { padding: 18px 16px; font-size: 14px; color: var(--text); line-height: 1.5; }
+.confirm-actions { display: flex; gap: 8px; padding: 0 16px 16px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ ÉCRAN SORTIES (défaut) ============ -->
+  <div class="screen active" id="screen-sorties">
+    <div class="topbar">
+      <div class="topbar-row">
+        <div>
+          <h1>Sorties</h1>
+          <div class="sub">Pointage &amp; historique du groupe</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- liste -->
+    <div id="sorties-list-view">
+      <button class="add-btn" onclick="openNewSortie()">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        Nouvelle sortie
+      </button>
+      <div id="sorties-list"></div>
+      <div id="sorties-empty" class="empty-state" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
+        <p>Aucune sortie enregistrée.</p>
+        <div class="hint">Crée une sortie pour pointer les présents.</div>
+      </div>
+    </div>
+
+    <!-- détail / pointage -->
+    <div id="sortie-detail-view" style="display:none">
+      <div class="detail-back" onclick="closeSortieDetail()">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        Toutes les sorties
+      </div>
+      <div class="detail-header">
+        <h2 id="sd-title">—</h2>
+        <div class="alt" id="sd-sub">—</div>
+      </div>
+      <div class="eff-bar">
+        <div class="stat-card">
+          <div class="stat-label">Effectif du jour</div>
+          <div class="stat-value" id="sd-effectif">0 <span class="stat-unit">pers.</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Abonnés présents</div>
+          <div class="stat-value" id="sd-nbpresents">0</div>
+        </div>
+      </div>
+      <div class="search-row">
+        <input class="search-input" type="text" id="sd-search" placeholder="Rechercher un abonné…" oninput="renderSortieDetail()">
+      </div>
+      <div id="sd-pointage"></div>
+      <div style="padding:14px 16px; display:flex; gap:8px;">
+        <button class="btn" onclick="editSortieMeta()">
+          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
+          Modifier date / libellé
+        </button>
+        <button class="btn danger" onclick="deleteSortie()">
+          <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          Supprimer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ÉCRAN ABONNÉS ============ -->
+  <div class="screen" id="screen-abonnes">
+    <div class="topbar">
+      <div class="topbar-row">
+        <div>
+          <h1>Abonnés</h1>
+          <div class="sub">Population &amp; cumul de présences</div>
+        </div>
+        <button class="icon-btn" onclick="document.getElementById('file-windev').click()" title="Importer la liste WinDev">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="search-row">
+      <input class="search-input" type="text" id="ab-search" placeholder="Rechercher…" oninput="renderAbonnes()">
+      <button class="filter-chip on" id="ab-filter-actifs" onclick="toggleActifsFilter()">Actifs</button>
+    </div>
+    <div id="abonnes-list"></div>
+    <div id="abonnes-empty" class="empty-state" style="display:none">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <p>Aucun abonné.</p>
+      <div class="hint">Importe la liste WinDev (icône en haut à droite).</div>
+    </div>
+  </div>
+
+  <!-- ============ ÉCRAN RÉGLAGES ============ -->
+  <div class="screen params-screen" id="screen-reglages">
+    <div class="topbar">
+      <div class="topbar-row">
+        <div>
+          <h1>Réglages</h1>
+          <div class="sub">Sauvegarde &amp; données</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="backup-status-wrap"></div>
+
+    <div class="set-block">
+      <div class="set-block-title">Sauvegarde (sécurité)</div>
+      <div class="set-row">
+        <div class="desc">L'historique n'existe que dans cette app. Exporte régulièrement : sans sauvegarde, la perte du téléphone efface tout.</div>
+        <button class="btn primary block" onclick="exportJSON()">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          Exporter la sauvegarde (JSON)
+        </button>
+      </div>
+      <div class="set-row">
+        <div class="desc set-warn">La restauration remplace l'intégralité des données actuelles.</div>
+        <button class="btn block" onclick="document.getElementById('file-restore').click()">
+          <svg viewBox="0 0 24 24"><path d="M3 9v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9"/><path d="M17 14l-5-5-5 5"/><path d="M12 9v12"/></svg>
+          Restaurer une sauvegarde
+        </button>
+      </div>
+    </div>
+
+    <div class="set-block">
+      <div class="set-block-title">Exploitation (facturation)</div>
+      <div class="set-row">
+        <div class="desc">Export tableur des présences et des cumuls, exploitable dans Excel.</div>
+        <button class="btn block" onclick="exportCSV()">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg>
+          Exporter pour Excel (CSV)
+        </button>
+      </div>
+    </div>
+
+    <div class="set-block">
+      <div class="set-block-title">Liste des abonnés</div>
+      <div class="set-row">
+        <div class="desc">Importe / met à jour la liste depuis un export WinDev. Ajout non destructif : aucun abonné ni historique n'est supprimé.</div>
+        <button class="btn block" onclick="document.getElementById('file-windev').click()">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          Importer la liste WinDev
+        </button>
+      </div>
+    </div>
+
+    <div style="text-align:center; font-size:11px; color:var(--text3); padding:8px 16px 4px; font-style:italic;">
+      Registre de présences · CimeEnvie
+    </div>
+  </div>
+
+  <!-- ============ NAV ============ -->
+  <div class="bottom-nav">
+    <button class="nav-btn active" id="nav-sorties" onclick="showScreen('sorties')">
+      <svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
+      Sorties
+    </button>
+    <button class="nav-btn" id="nav-abonnes" onclick="showScreen('abonnes')">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Abonnés
+    </button>
+    <button class="nav-btn" id="nav-reglages" onclick="showScreen('reglages')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Réglages
+    </button>
+  </div>
+</div>
+
+<!-- MODAL SORTIE (date / libellé) -->
+<div class="modal-overlay" id="modal-sortie">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="modal-sortie-title">Nouvelle sortie</span>
+      <button class="modal-close" onclick="closeModal('modal-sortie')">×</button>
+    </div>
+    <div class="form-row">
+      <div class="form-label">Date</div>
+      <input class="form-input" type="date" id="f-date">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Libellé <small>(optionnel)</small></div>
+      <input class="form-input wide" type="text" id="f-libelle" placeholder="ex: Marche du mardi" style="flex:2">
+    </div>
+    <div class="form-actions">
+      <button class="btn primary" style="flex:1" onclick="saveSortie()">Enregistrer</button>
+      <button class="btn" style="flex:1" onclick="closeModal('modal-sortie')">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- inputs fichiers -->
+<input type="file" id="file-windev" class="file-hidden" accept=".json,application/json" onchange="importWinDev(event)">
+<input type="file" id="file-restore" class="file-hidden" accept=".json,application/json" onchange="restoreBackup(event)">
+
+<script>
+/* ============================================================
+   REGISTRE DE PRÉSENCES — patterns hérités d'ODM
+   - PWA mono-fichier, ES5, sans framework
+   - localStorage clé unique sérialisée + migration défensive
+   - AUCUN médical, AUCUN Web Crypto (cf. spec §4.6)
+   ============================================================ */
+
+var STORE_KEY = 'registre_state';
+var SCHEMA_VERSION = 1;
+/* Seuil d'alerte « sauvegarde ancienne » (jours) */
+var BACKUP_WARN_DAYS = 14;
+/* Champs retenus à l'import WinDev — RÈGLE STRICTE (spec §2) : rien d'autre */
+var IMPORT_FIELDS = ['IDPARTICIPANT', 'NOM', 'PRENOM', 'TEL'];
+
+var state = { schemaVersion: SCHEMA_VERSION, abonnes: [], sorties: [], meta: { lastImportWinDev: null, lastExport: null } };
+var ui = { activeSortieId: null, abFilterActifs: true };
+
+/* ---------- persistance ---------- */
+function load() {
+  try {
+    var s = localStorage.getItem(STORE_KEY);
+    if (s) state = JSON.parse(s);
+  } catch(e) { state = null; }
+  if (!state || typeof state !== 'object') {
+    state = { schemaVersion: SCHEMA_VERSION, abonnes: [], sorties: [], meta: { lastImportWinDev: null, lastExport: null } };
+  }
+  /* migration défensive : injecter les défauts manquants */
+  if (typeof state.schemaVersion !== 'number') state.schemaVersion = SCHEMA_VERSION;
+  if (!Array.isArray(state.abonnes)) state.abonnes = [];
+  if (!Array.isArray(state.sorties)) state.sorties = [];
+  if (!state.meta || typeof state.meta !== 'object') state.meta = { lastImportWinDev: null, lastExport: null };
+  if (state.meta.lastImportWinDev === undefined) state.meta.lastImportWinDev = null;
+  if (state.meta.lastExport === undefined) state.meta.lastExport = null;
+  state.abonnes.forEach(function(a) {
+    if (a.actif === undefined) a.actif = true;
+    if (a.anonymise === undefined) a.anonymise = false;
+    if (a.NOM === undefined) a.NOM = '';
+    if (a.PRENOM === undefined) a.PRENOM = '';
+    if (a.TEL === undefined) a.TEL = '';
+  });
+  state.sorties.forEach(function(s2) {
+    if (!s2.id) s2.id = uid('s');
+    if (s2.date === undefined) s2.date = '';
+    if (s2.libelle === undefined) s2.libelle = '';
+    if (!Array.isArray(s2.presences)) s2.presences = [];
+    s2.presences.forEach(function(p) { if (typeof p.nb !== 'number' || p.nb < 1) p.nb = 1; });
+  });
+  state.schemaVersion = SCHEMA_VERSION;
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch(e) { showToast('Échec de l\'enregistrement.', true); }
+}
+
+/* ---------- helpers ---------- */
+function uid(prefix) { return (prefix || '') + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function escHtml(s) { return ('' + (s == null ? '' : s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+function todayISO() { var d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+function fmtDateFr(iso) {
+  if (!iso || iso.length < 10) return '(sans date)';
+  var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0];
+}
+function getAbonne(id) { for (var i=0;i<state.abonnes.length;i++) if (state.abonnes[i].IDPARTICIPANT === id) return state.abonnes[i]; return null; }
+function getSortie(id) { for (var i=0;i<state.sorties.length;i++) if (state.sorties[i].id === id) return state.sorties[i]; return null; }
+function abonneLabel(a) {
+  if (a.anonymise) return '(abonné anonymisé)';
+  var n = ((a.NOM || '') + ' ' + (a.PRENOM || '')).trim();
+  return n || ('#' + a.IDPARTICIPANT);
+}
+
+/* ---------- données dérivées (jamais stockées) ---------- */
+function effectifSortie(sortie) {
+  var t = 0; sortie.presences.forEach(function(p){ t += p.nb; }); return t;
+}
+function cumulAbonne(id) {
+  var t = 0;
+  state.sorties.forEach(function(s){
+    s.presences.forEach(function(p){ if (p.IDPARTICIPANT === id) t += p.nb; });
+  });
+  return t;
+}
+
+/* ---------- navigation ---------- */
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('screen-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'sorties') { closeSortieDetail(); renderSortiesList(); }
+  if (name === 'abonnes') renderAbonnes();
+  if (name === 'reglages') renderBackupStatus();
+}
+
+/* ============================================================
+   ÉCRAN SORTIES — liste
+   ============================================================ */
+function renderSortiesList() {
+  var listEl = document.getElementById('sorties-list');
+  var emptyEl = document.getElementById('sorties-empty');
+  var arr = state.sorties.slice().sort(function(a,b){
+    /* récent -> ancien ; date vide en bas */
+    if (a.date === b.date) return 0;
+    if (!a.date) return 1; if (!b.date) return -1;
+    return a.date < b.date ? 1 : -1;
+  });
+  if (!arr.length) { listEl.innerHTML = ''; emptyEl.style.display = 'flex'; return; }
+  emptyEl.style.display = 'none';
+  var html = '';
+  arr.forEach(function(s){
+    var eff = effectifSortie(s);
+    var lib = s.libelle ? ' · ' + escHtml(s.libelle) : '';
+    html += '<div class="list-item" onclick="openSortieDetail(\'' + s.id + '\')">'
+      + '<div class="li-main"><div class="li-name">' + escHtml(fmtDateFr(s.date)) + lib + '</div>'
+      + '<div class="li-meta">' + s.presences.length + ' abonné(s) · ' + eff + ' pers.</div></div>'
+      + '<span class="li-badge' + (eff ? '' : ' muted') + '">' + eff + '</span>'
+      + '<span class="li-chevron"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>'
+      + '</div>';
+  });
+  listEl.innerHTML = html;
+}
+
+/* ---------- créer / éditer une sortie ---------- */
+function openNewSortie() {
+  ui.editingSortieId = null;
+  document.getElementById('modal-sortie-title').textContent = 'Nouvelle sortie';
+  document.getElementById('f-date').value = todayISO();
+  document.getElementById('f-libelle').value = '';
+  openModal('modal-sortie');
+}
+function editSortieMeta() {
+  var s = getSortie(ui.activeSortieId); if (!s) return;
+  ui.editingSortieId = s.id;
+  document.getElementById('modal-sortie-title').textContent = 'Modifier la sortie';
+  document.getElementById('f-date').value = s.date || '';
+  document.getElementById('f-libelle').value = s.libelle || '';
+  openModal('modal-sortie');
+}
+function saveSortie() {
+  var date = document.getElementById('f-date').value;
+  var libelle = document.getElementById('f-libelle').value.trim();
+  if (!date) { showToast('Choisis une date.', true); return; }
+  if (ui.editingSortieId) {
+    var s = getSortie(ui.editingSortieId);
+    if (s) { s.date = date; s.libelle = libelle; }
+    save(); closeModal('modal-sortie');
+    renderSortieDetail(); renderSortiesList();
+    showToast('Sortie mise à jour.');
+  } else {
+    /* doublon de date autorisé sans avertissement (spec §4.3) */
+    var ns = { id: uid('s'), date: date, libelle: libelle, presences: [] };
+    state.sorties.push(ns);
+    save(); closeModal('modal-sortie');
+    openSortieDetail(ns.id);
+    renderSortiesList();
+    showToast('Sortie créée.');
+  }
+}
+function deleteSortie() {
+  var s = getSortie(ui.activeSortieId); if (!s) return;
+  showConfirm('Supprimer la sortie du ' + fmtDateFr(s.date) + ' et tout son pointage ?', function(){
+    state.sorties = state.sorties.filter(function(x){ return x.id !== s.id; });
+    save(); closeSortieDetail(); renderSortiesList();
+    showToast('Sortie supprimée.');
+  }, 'Supprimer');
+}
+
+/* ---------- détail / pointage ---------- */
+function openSortieDetail(id) {
+  ui.activeSortieId = id;
+  document.getElementById('sorties-list-view').style.display = 'none';
+  document.getElementById('sortie-detail-view').style.display = 'block';
+  document.getElementById('sd-search').value = '';
+  renderSortieDetail();
+}
+function closeSortieDetail() {
+  ui.activeSortieId = null;
+  document.getElementById('sortie-detail-view').style.display = 'none';
+  document.getElementById('sorties-list-view').style.display = 'block';
+}
+function presenceOf(sortie, id) {
+  for (var i=0;i<sortie.presences.length;i++) if (sortie.presences[i].IDPARTICIPANT === id) return sortie.presences[i];
+  return null;
+}
+function renderSortieDetail() {
+  var s = getSortie(ui.activeSortieId); if (!s) return;
+  document.getElementById('sd-title').textContent = fmtDateFr(s.date) + (s.libelle ? ' · ' + s.libelle : '');
+  document.getElementById('sd-sub').textContent = s.presences.length + ' abonné(s) présent(s)';
+  document.getElementById('sd-effectif').innerHTML = effectifSortie(s) + ' <span class="stat-unit">pers.</span>';
+  document.getElementById('sd-nbpresents').textContent = s.presences.length;
+
+  var q = (document.getElementById('sd-search').value || '').toLowerCase().trim();
+  /* pointage : abonnés actifs (spec §4.4), + ceux déjà pointés même si inactifs */
+  var rows = state.abonnes.filter(function(a){
+    if (a.anonymise) return presenceOf(s, a.IDPARTICIPANT) != null; /* anonymisé visible seulement si déjà pointé */
+    if (!a.actif && !presenceOf(s, a.IDPARTICIPANT)) return false;
+    if (q) { return abonneLabel(a).toLowerCase().indexOf(q) !== -1; }
+    return true;
+  });
+  rows.sort(function(a,b){ return abonneLabel(a).localeCompare(abonneLabel(b), 'fr'); });
+
+  var el = document.getElementById('sd-pointage');
+  if (!state.abonnes.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:40px 24px"><p>Aucun abonné importé.</p><div class="hint">Va dans Abonnés pour importer la liste WinDev.</div></div>';
+    return;
+  }
+  if (!rows.length) { el.innerHTML = '<div class="no-points" style="padding:24px;text-align:center;color:var(--text3);font-style:italic;">Aucun abonné ne correspond.</div>'; return; }
+  var html = '';
+  rows.forEach(function(a){
+    var pr = presenceOf(s, a.IDPARTICIPANT);
+    var present = pr != null;
+    var nb = present ? pr.nb : 1;
+    var sub = a.TEL ? '<small>' + escHtml(a.TEL) + '</small>' : '';
+    html += '<div class="pp-row' + (present ? ' present' : '') + '" data-id="' + a.IDPARTICIPANT + '">'
+      + '<div class="pp-check" onclick="togglePresence(' + a.IDPARTICIPANT + ')"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 6"/></svg></div>'
+      + '<div class="pp-name" onclick="togglePresence(' + a.IDPARTICIPANT + ')">' + escHtml(abonneLabel(a)) + sub + '</div>'
+      + '<div class="pp-stepper">'
+      + '<button onclick="bumpNb(' + a.IDPARTICIPANT + ',-1)">−</button>'
+      + '<span class="pp-nb" id="nb-' + a.IDPARTICIPANT + '">' + nb + '</span>'
+      + '<button onclick="bumpNb(' + a.IDPARTICIPANT + ',1)">+</button>'
+      + '</div></div>';
+  });
+  el.innerHTML = html;
+}
+function togglePresence(id) {
+  var s = getSortie(ui.activeSortieId); if (!s) return;
+  var pr = presenceOf(s, id);
+  if (pr) { s.presences = s.presences.filter(function(p){ return p.IDPARTICIPANT !== id; }); }
+  else { s.presences.push({ IDPARTICIPANT: id, nb: 1 }); }
+  save(); renderSortieDetail();
+}
+function bumpNb(id, delta) {
+  var s = getSortie(ui.activeSortieId); if (!s) return;
+  var pr = presenceOf(s, id);
+  if (!pr) { if (delta > 0) { s.presences.push({ IDPARTICIPANT: id, nb: 1 }); } save(); renderSortieDetail(); return; }
+  pr.nb += delta;
+  if (pr.nb < 1) { /* descendre sous 1 = retirer la présence */ s.presences = s.presences.filter(function(p){ return p.IDPARTICIPANT !== id; }); }
+  save(); renderSortieDetail();
+}
+
+/* ============================================================
+   ÉCRAN ABONNÉS
+   ============================================================ */
+function toggleActifsFilter() {
+  ui.abFilterActifs = !ui.abFilterActifs;
+  document.getElementById('ab-filter-actifs').classList.toggle('on', ui.abFilterActifs);
+  renderAbonnes();
+}
+function renderAbonnes() {
+  var listEl = document.getElementById('abonnes-list');
+  var emptyEl = document.getElementById('abonnes-empty');
+  if (!state.abonnes.length) { listEl.innerHTML = ''; emptyEl.style.display = 'flex'; return; }
+  emptyEl.style.display = 'none';
+  var q = (document.getElementById('ab-search').value || '').toLowerCase().trim();
+  var arr = state.abonnes.filter(function(a){
+    if (ui.abFilterActifs && !a.actif) return false;
+    if (q) return abonneLabel(a).toLowerCase().indexOf(q) !== -1;
+    return true;
+  });
+  arr.sort(function(a,b){ return abonneLabel(a).localeCompare(abonneLabel(b), 'fr'); });
+  if (!arr.length) { listEl.innerHTML = '<div class="no-points" style="padding:24px;text-align:center;color:var(--text3);font-style:italic;">Aucun abonné ne correspond.</div>'; return; }
+  var html = '';
+  arr.forEach(function(a){
+    var cumul = cumulAbonne(a.IDPARTICIPANT);
+    var statut = a.anonymise ? '<small>anonymisé</small>' : (a.actif ? (a.TEL ? '<small>' + escHtml(a.TEL) + '</small>' : '') : '<small>inactif</small>');
+    html += '<div class="ab-row' + (a.actif ? '' : ' inactive') + '">'
+      + '<div class="ab-name">' + escHtml(abonneLabel(a)) + statut + '</div>'
+      + '<div class="ab-cumul">' + cumul + ' <small>pers.</small></div>'
+      + '<div class="ab-actions">'
+      + (a.anonymise ? '' : '<button class="mini-btn danger" title="Anonymiser" onclick="anonymiser(' + a.IDPARTICIPANT + ')"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M17 11l5 5M22 11l-5 5"/></svg></button>')
+      + '</div></div>';
+  });
+  listEl.innerHTML = html;
+}
+function anonymiser(id) {
+  var a = getAbonne(id); if (!a || a.anonymise) return;
+  showConfirm('Anonymiser ' + abonneLabel(a) + ' ? Son identité (nom, prénom, téléphone) sera effacée. Ses présences passées sont conservées (sans lien nominatif).', function(){
+    a.NOM = ''; a.PRENOM = ''; a.TEL = ''; a.anonymise = true; a.actif = false;
+    save(); renderAbonnes();
+    showToast('Abonné anonymisé.');
+  }, 'Anonymiser');
+}
+
+/* ============================================================
+   IMPORT WINDEV — upsert non destructif, filtre médical strict
+   ============================================================ */
+function importWinDev(event) {
+  var file = event.target.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var data, list;
+    try {
+      data = JSON.parse(e.target.result);
+      list = data.REQ_PARTI_LISTE_MEDICALE_JSON || data.REQ_PARTI_LISTE_ABONNES_JSON || (Array.isArray(data) ? data : null);
+      if (!Array.isArray(list) || !list.length) throw new Error();
+    } catch(err) { showToast('Fichier abonnés invalide.', true); event.target.value=''; return; }
+    /* ne garder que les enregistrements avec un IDPARTICIPANT exploitable */
+    var clean = list.filter(function(p){ return p && (p.IDPARTICIPANT || p.IDPARTICIPANT === 0); });
+    if (!clean.length) { showToast('Aucun IDPARTICIPANT trouvé.', true); event.target.value=''; return; }
+    showConfirm('Importer / mettre à jour ' + clean.length + ' abonné(s) ? Aucun abonné ni historique existant ne sera supprimé.', function(){
+      var seen = {}, added = 0, updated = 0;
+      clean.forEach(function(p){
+        var id = p.IDPARTICIPANT;
+        seen[id] = true;
+        var existing = getAbonne(id);
+        /* RÈGLE STRICTE : on ne pioche QUE IMPORT_FIELDS, le médical est jeté */
+        if (existing) {
+          existing.NOM = p.NOM || ''; existing.PRENOM = p.PRENOM || ''; existing.TEL = p.TEL || '';
+          existing.actif = true;
+          /* un abonné anonymisé qui revient dans l'export : il reste anonymisé (on ne ressuscite pas l'identité) */
+          if (existing.anonymise) { existing.NOM = ''; existing.PRENOM = ''; existing.TEL = ''; existing.actif = false; }
+          updated++;
+        } else {
+          state.abonnes.push({ IDPARTICIPANT: id, NOM: p.NOM || '', PRENOM: p.PRENOM || '', TEL: p.TEL || '', actif: true, anonymise: false });
+          added++;
+        }
+      });
+      /* abonnés connus absents de l'export -> inactifs (conservés) */
+      var deactivated = 0;
+      state.abonnes.forEach(function(a){ if (!seen[a.IDPARTICIPANT] && a.actif) { a.actif = false; deactivated++; } });
+      state.meta.lastImportWinDev = new Date().toISOString();
+      save(); renderAbonnes();
+      showToast(added + ' ajouté(s), ' + updated + ' à jour' + (deactivated ? ', ' + deactivated + ' inactivé(s)' : '') + '.');
+    }, 'Importer');
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+/* ============================================================
+   EXPORTS & RESTAURATION
+   ============================================================ */
+function triggerDownload(content, filename, mime) {
+  var blob = new Blob([content], { type: mime });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+function exportJSON() {
+  state.meta.lastExport = new Date().toISOString();
+  save();
+  var payload = JSON.stringify(state, null, 2);
+  triggerDownload(payload, 'registre-sauvegarde-' + todayISO() + '.json', 'application/json');
+  renderBackupStatus();
+  showToast('Sauvegarde exportée.');
+}
+function csvCell(v) {
+  v = (v == null ? '' : '' + v);
+  if (/[";\n]/.test(v)) v = '"' + v.replace(/"/g, '""') + '"';
+  return v;
+}
+function exportCSV() {
+  /* Détail : une ligne par sortie × abonné présent + bloc synthèse par abonné */
+  var rows = [];
+  rows.push(['DATE','LIBELLE','IDPARTICIPANT','NOM','PRENOM','NB_PERSONNES'].join(';'));
+  var sorted = state.sorties.slice().sort(function(a,b){ return (a.date||'') < (b.date||'') ? -1 : 1; });
+  sorted.forEach(function(s){
+    s.presences.forEach(function(p){
+      var a = getAbonne(p.IDPARTICIPANT) || {};
+      rows.push([csvCell(s.date), csvCell(s.libelle), csvCell(p.IDPARTICIPANT), csvCell(a.NOM), csvCell(a.PRENOM), csvCell(p.nb)].join(';'));
+    });
+  });
+  rows.push('');
+  rows.push(['SYNTHESE PAR ABONNE'].join(';'));
+  rows.push(['IDPARTICIPANT','NOM','PRENOM','ACTIF','CUMUL_PERSONNES','NB_SORTIES'].join(';'));
+  var sortedAb = state.abonnes.slice().sort(function(a,b){ return abonneLabel(a).localeCompare(abonneLabel(b),'fr'); });
+  sortedAb.forEach(function(a){
+    var nbSorties = 0;
+    state.sorties.forEach(function(s){ if (presenceOf(s, a.IDPARTICIPANT)) nbSorties++; });
+    rows.push([csvCell(a.IDPARTICIPANT), csvCell(a.NOM), csvCell(a.PRENOM), csvCell(a.actif ? 'oui':'non'), csvCell(cumulAbonne(a.IDPARTICIPANT)), csvCell(nbSorties)].join(';'));
+  });
+  /* BOM UTF-8 pour Excel */
+  triggerDownload('\ufeff' + rows.join('\r\n'), 'registre-presences-' + todayISO() + '.csv', 'text/csv;charset=utf-8');
+  showToast('Export CSV généré.');
+}
+function restoreBackup(event) {
+  var file = event.target.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var data;
+    try {
+      data = JSON.parse(e.target.result);
+      if (!data || !Array.isArray(data.abonnes) || !Array.isArray(data.sorties)) throw new Error();
+    } catch(err) { showToast('Sauvegarde invalide.', true); event.target.value=''; return; }
+    var nbA = data.abonnes.length, nbS = data.sorties.length;
+    showConfirm('Restaurer cette sauvegarde ? Cela REMPLACE toutes les données actuelles (' + state.abonnes.length + ' abonnés, ' + state.sorties.length + ' sorties) par ' + nbA + ' abonnés et ' + nbS + ' sorties.', function(){
+      state = data;
+      load();      /* re-applique la migration défensive sur les données restaurées */
+      save();
+      showScreen('sorties');
+      showToast('Sauvegarde restaurée.');
+    }, 'Restaurer');
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- statut sauvegarde ---------- */
+function renderBackupStatus() {
+  var wrap = document.getElementById('backup-status-wrap');
+  if (!state.sorties.length && !state.abonnes.length) { wrap.innerHTML = ''; return; }
+  var last = state.meta.lastExport;
+  if (!last) {
+    wrap.innerHTML = '<div class="set-block"><div class="backup-status warn">⚠ Aucune sauvegarde exportée. L\'historique n\'existe que sur cet appareil.</div></div>';
+    return;
+  }
+  var days = Math.floor((Date.now() - new Date(last).getTime()) / 86400000);
+  var txt, cls;
+  if (days >= BACKUP_WARN_DAYS) { cls = 'warn'; txt = '⚠ Dernière sauvegarde il y a ' + days + ' jours. Pense à exporter.'; }
+  else { cls = 'ok'; txt = '✓ Dernière sauvegarde : ' + fmtDateFr(last.substring(0,10)) + ' (' + (days === 0 ? "aujourd'hui" : 'il y a ' + days + ' j') + ').'; }
+  wrap.innerHTML = '<div class="set-block"><div class="backup-status ' + cls + '">' + txt + '</div></div>';
+}
+
+/* ---------- modals génériques ---------- */
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+/* ---------- toast / confirm (brandés) ---------- */
+var _toastTimer = null;
+function showToast(msg, isError) {
+  var t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.toggle('error', !!isError);
+  t.classList.add('show');
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3200);
+}
+function showConfirm(msg, onOk, okLabel) {
+  var ov = document.getElementById('confirm-overlay');
+  document.getElementById('confirm-body').textContent = msg;
+  document.getElementById('confirm-ok').textContent = okLabel || 'Confirmer';
+  ov.classList.add('open');
+  var okBtn = document.getElementById('confirm-ok');
+  var cancelBtn = document.getElementById('confirm-cancel');
+  function cleanup() { ov.classList.remove('open'); okBtn.onclick = null; cancelBtn.onclick = null; }
+  okBtn.onclick = function(){ cleanup(); onOk(); };
+  cancelBtn.onclick = function(){ cleanup(); };
+}
+
+/* fermeture modal au clic sur l'overlay */
+document.querySelectorAll('.modal-overlay').forEach(function(m){
+  m.addEventListener('click', function(e){ if (e.target === m) m.classList.remove('open'); });
+});
+
+/* SW (cache offline) — fichier sw.js géré côté déploiement */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
+
+/* ---------- init ---------- */
+load();
+renderSortiesList();
+</script>
+
+<!-- toast + confirm (brandés CimeEnvie) -->
+<div class="toast-wrap"><div class="toast" id="toast"><div class="toast-head">Registre · CimeEnvie</div><div class="toast-msg" id="toast-msg"></div></div></div>
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-head">Registre · CimeEnvie</div>
+    <div class="confirm-body" id="confirm-body"></div>
+    <div class="confirm-actions">
+      <button class="btn primary" id="confirm-ok" style="flex:1">Confirmer</button>
+      <button class="btn" id="confirm-cancel" style="flex:1">Annuler</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
