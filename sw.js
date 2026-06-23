@@ -4,7 +4,7 @@
    À CHAQUE déploiement : incrémenter CACHE_VERSION ci-dessous.
    ============================================================ */
 
-var CACHE_VERSION = 'registre-v2';
+var CACHE_VERSION = 'registre-v3';
 
 /* Chemins relatifs au scope du SW (= dossier où il est servi).
    On met en cache la racine ET index.html : sur GitHub Pages, l'URL
@@ -12,7 +12,10 @@ var CACHE_VERSION = 'registre-v2';
 var ASSETS = [
   './',
   './index.html',
-  './manifest.json'
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-512-maskable.png'
 ];
 
 self.addEventListener('install', function(event) {
